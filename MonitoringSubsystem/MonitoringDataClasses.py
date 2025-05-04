@@ -39,6 +39,7 @@ MONITORING_PROCESS_POINT = namedtuple('MONITORING_PROCESS_POINT', [
 MONITORING_SYSTEM_POINT = namedtuple('MONITORING_SYSTEM_POINT', [
     'host_name',
     'boot_time',
+    'cpu_freq',
     'cpu_user_time',
     'cpu_system_time',
     'cpu_idle_time',

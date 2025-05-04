@@ -17,7 +17,6 @@ class SystemMonitoring:
 
     def _get_system_info(self):
         return {'boot_time': psutil.boot_time(),
-                'cpu': psutil.cpu_freq(percpu=True),
                 'cpu_logical_core_count': psutil.cpu_count(logical=True),
                 'cpu_physical_core_count': psutil.cpu_count(logical=False),
                 'memory': psutil.virtual_memory(),
@@ -79,7 +78,6 @@ class SystemMonitoring:
 
     @staticmethod
     def _cpu_idle_time():
-
         return psutil.cpu_times().idle
 
     def _cpu_usage_percent(self):
@@ -104,6 +102,32 @@ class SystemMonitoring:
             for key in core_stat_dict.keys():
                 metrics.append(METRIC(name=f"cpu_usage_core_{core_num}_{key}",
                                       value=core_stat_dict.get(key)))
+        return metrics
+
+    def _get_cpu_freq(self):
+        metrics = []
+        try:
+            # Получаем общую частоту процессора
+            overall_freq = psutil.cpu_freq()
+            if overall_freq:
+                if overall_freq.current is not None:
+                    metrics.append(METRIC(name="cpu_freq_current", value=overall_freq.current))
+                if overall_freq.min is not None:
+                    metrics.append(METRIC(name="cpu_freq_min", value=overall_freq.min))
+                if overall_freq.max is not None:
+                    metrics.append(METRIC(name="cpu_freq_max", value=overall_freq.max))
+
+            # Получаем частоты для каждого ядра
+            per_core_freq = psutil.cpu_freq(percpu=True)
+            for core_id, core_freq in enumerate(per_core_freq):
+                if core_freq.current is not None:
+                    metrics.append(METRIC(name=f"cpu_freq_core_{core_id}_current", value=core_freq.current))
+                if core_freq.min is not None:
+                    metrics.append(METRIC(name=f"cpu_freq_core_{core_id}_min", value=core_freq.min))
+                if core_freq.max is not None:
+                    metrics.append(METRIC(name=f"cpu_freq_core_{core_id}_max", value=core_freq.max))
+        except Exception as e:
+            self.logger.error(f"Ошибка при получении частоты CPU: {e}")
         return metrics
 
     def __get_metrics_by_name_part(self, name_part, metrics=None):
@@ -210,6 +234,7 @@ class SystemMonitoring:
         return MONITORING_SYSTEM_POINT(
             host_name=gethostname(),
             boot_time=psutil.boot_time(),
+            cpu_freq=self._get_cpu_freq(),
             cpu_user_time=self._cpu_user_time(),
             cpu_system_time=self._cpu_system_time(),
             cpu_idle_time=self._cpu_idle_time(),
@@ -244,7 +269,7 @@ if __name__ == "__main__":
     sm = SystemMonitoring()
     with sm:
         while True:
-            print(sm.get_system_monitoring_point())
+            print(sm._get_cpu_freq())
             time.sleep(3)
 
     # while True:

@@ -115,6 +115,7 @@ class DataCollector:
                                                                       SYSTEM_ERROR_MONITORING_POINT]):
         self.data_collector_queue.put(metric_point)
 
+    # Tests process for processing collected metrics
     @staticmethod
     def _processing_loop(metrics_queue: JQueue, max_size: int):
         # Self-monitoring setup
