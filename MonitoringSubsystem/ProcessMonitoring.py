@@ -1,9 +1,9 @@
 import os
 import time
 import psutil
-import logging
 from socket import gethostname
 from concurrent.futures import ThreadPoolExecutor
+from MonitoringSubsystem.Commons import get_logger_by_params_and_make_log_folder
 from MonitoringSubsystem.MonitoringDataClasses import MONITORING_PROCESS_POINT
 
 global cpu_usage_percent_process
@@ -35,7 +35,7 @@ class ProcessMonitoring:
         self.process_name = process_name if process_name else get_process_name_by_pid(process_id=self.process_id)
         self.process = psutil.Process()
         self.cpu_count = psutil.cpu_count()
-        self.logger = logger if logger else logging.getLogger('root')
+        self.logger = logger if logger else get_logger_by_params_and_make_log_folder()
         self.cpu_mon_interval = cpu_mon_interval
         self.realtime_cpu_monitoring = False
         self.cpu_per_core = cpu_per_core
@@ -75,7 +75,9 @@ class ProcessMonitoring:
         return self.process.num_threads()
 
     def get_process_monitoring_point(self):
-        return MONITORING_PROCESS_POINT(
+        process_monitoring_point = None
+        try:
+            process_monitoring_point = MONITORING_PROCESS_POINT(
             host_name=gethostname(),
             process_name=self.process_name,
             process_id=self.process_id,
@@ -86,7 +88,10 @@ class ProcessMonitoring:
             memory_usage_percent=self._get_process_memory_usage_percent(),
             threads_count=self._get_threads_count(),
             time_stamp=time.time_ns()
-        )
+            )
+        except Exception as exc:
+            self.logger.exception(exc)
+        return process_monitoring_point
 
 
 if __name__ == "__main__":

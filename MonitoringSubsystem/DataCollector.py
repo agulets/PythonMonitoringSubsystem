@@ -5,6 +5,7 @@ from socket import gethostname
 from threading import Thread, Event
 
 from MonitoringSubsystem import InfluxSender
+from MonitoringSubsystem.Commons import get_logger_by_params_and_make_log_folder
 from MonitoringSubsystem.InfluxSender import InfluxSender, get_influx_points_by_data_collector_point
 from MonitoringSubsystem.JQueue import JQueue
 from MonitoringSubsystem.MonitoringDataClasses import (
@@ -24,7 +25,7 @@ class DataCollector:
     def __init__(self, data_collector_queue: JQueue = None, max_queue_size: int = 10000, logger: logging.Logger = None):
         self.data_collector_queue = data_collector_queue if data_collector_queue else JQueue()
         self.max_queue_size = max_queue_size
-        self.logger = logger if logger else self._configure_default_logger()
+        self.logger = logger if logger else get_logger_by_params_and_make_log_folder()
 
         self.system_monitoring_enabled = Event()
         self.process_monitoring_enabled = Event()
@@ -36,23 +37,14 @@ class DataCollector:
         if data_collector_queue is None:
             self.start_processing_process()
 
-    def _configure_default_logger(self):
-        logger = logging.getLogger("DataCollector")
-        logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        return logger
-
     def get_data_collector_queue(self) -> JQueue:
         return self.data_collector_queue
 
     # Process loop for host monitoring, self-process with data_collector_queue
     @staticmethod
-    def _system_monitoring_loop(data_collector_queue, scrape_interval):
-        system_monitor = SystemMonitoring()
-        process_monitor = ProcessMonitoring(process_name="self_monitoring_process")
+    def _system_monitoring_loop(data_collector_queue, scrape_interval, logger=None):
+        system_monitor = SystemMonitoring(logger=logger)
+        process_monitor = ProcessMonitoring(process_name="self_monitoring_process", logger=logger)
         while True:
             with system_monitor:
                 system_metric_point = system_monitor.get_system_monitoring_point()
@@ -74,7 +66,7 @@ class DataCollector:
         self.system_monitoring_process = multiprocessing.Process(
             name="host_monitoring_process",
             target=self._system_monitoring_loop,
-            args=(self.data_collector_queue, scrape_interval),
+            args=(self.data_collector_queue, scrape_interval, self.logger),
             daemon=True
         )
         self.system_monitoring_process.start()
@@ -115,7 +107,6 @@ class DataCollector:
                                                                       SYSTEM_ERROR_MONITORING_POINT]):
         self.data_collector_queue.put(metric_point)
 
-    # Tests process for processing collected metrics
     @staticmethod
     def _processing_loop(metrics_queue: JQueue, max_size: int):
         # Self-monitoring setup
