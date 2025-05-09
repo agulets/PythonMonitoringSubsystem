@@ -264,6 +264,7 @@ class SystemMonitoring:
                 network_bytes_sent=self._network_bytes_sent(),
                 time_stamp=time.time_ns()
             )
+             self.logger.debug(f"Get system monitoring point:'{monitoring_system_point}'")
         except Exception as err:
             self.logger.exception(err)
 

@@ -34,15 +34,15 @@ if __name__ == "__main__":
     from multiprocessing import Process
 
     # Main process
-    main_data_collector = DataCollector()
+    main_data_collector = DataCollector(max_queue_size=20)
     # Start system monitoring
-    main_data_collector.start_system_monitoring_process(scrape_interval=1)
-    # Start main process monitoring
-    main_data_collector.start_thread_for_monitoring_process(process_name="Main")
-
-    # Create and start worker process
-    worker = Process(target=worker_process, args=(main_data_collector.get_data_collector_queue(),))
-    worker.start()
+    main_data_collector.start_system_monitoring_process(scrape_interval=3)
+    # # Start main process monitoring
+    # main_data_collector.start_thread_for_monitoring_process(process_name="Main")
+    #
+    # # Create and start worker process
+    # worker = Process(target=worker_process, args=(main_data_collector.get_data_collector_queue(),))
+    # worker.start()
 
     while True:
         time.sleep(3)

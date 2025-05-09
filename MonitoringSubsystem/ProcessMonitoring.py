@@ -89,6 +89,7 @@ class ProcessMonitoring:
             threads_count=self._get_threads_count(),
             time_stamp=time.time_ns()
             )
+            self.logger.debug(f"Get process monitoring point:'{process_monitoring_point}'")
         except Exception as exc:
             self.logger.exception(exc)
         return process_monitoring_point
