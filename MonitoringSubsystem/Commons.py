@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 import time
 import logging
 from multiprocessing import current_process
@@ -21,38 +22,54 @@ class time_it:
         self.execution_time = round(self.end_time - self.start_time, self._round)
 
 
-def get_logger_by_params_and_make_log_folder(log_name=None,
-                                             log_dir=None,
-                                             log_file_name=None,
-                                             log_size=104857608,
-                                             log_file_count=2,
-                                             log_level=20,
-                                             formatter=None,
-                                             console_handler=True):
-    formatter = formatter if formatter else '%(asctime)s\t%(levelname)s\t%(processName)s:%(funcName)s:%(lineno)d:\t%(message)s'
-    log_formatter = logging.Formatter(formatter)
+def get_logger_by_params_and_make_log_folder(
+    log_name=None,
+    log_dir=None,
+    log_file_name=None,
+    log_size=104857608,
+    log_file_count=2,
+    log_level=20,
+    formatter=None,
+    console_handler=True
+):
+    # Настройка форматера
+    log_format = formatter or ('%(asctime)s\t%(levelname)s\t%(processName)s:' '%(funcName)s:%(lineno)d:\t%(message)s')
+    log_formatter = logging.Formatter(log_format)
 
-    if log_name:
-        log_dir = log_dir if log_dir else os.path.join(os.path.dirname(__file__), 'LOGS')
-        log_file_name = log_file_name if log_file_name else f"{current_process().name}"
-
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        log_filename = f"{os.path.join(log_dir, log_file_name)}.log"
-        log_file_handler = RotatingFileHandler(filename=log_filename, maxBytes=log_size, backupCount=log_file_count)
-        log_file_handler.setFormatter(log_formatter)
-
-        logger = logging.getLogger(log_name)
-        logger.addHandler(log_file_handler)
+    # Определение имени логгера
+    if log_name is None:
+        process_name = current_process().name
+        thread_name = threading.current_thread().name
+        logger_name = f"{process_name}__{thread_name}"
     else:
-        logger = logging.getLogger('root')
+        logger_name = log_name
 
+    logger = logging.getLogger(logger_name)
     logger.setLevel(log_level)
 
+    # Настройка файлового обработчика при наличии параметров для записи в файл
+    if log_dir is not None or log_file_name is not None:
+        # Определение пути для логирования
+        final_log_dir = log_dir or os.path.join(os.getcwd(), "LOGS")
+        final_log_name = log_file_name or logger_name
+
+        # Создание директории при необходимости
+        os.makedirs(final_log_dir, exist_ok=True)
+
+        # Создание и настройка файлового обработчика
+        log_filename = os.path.join(final_log_dir, f"{final_log_name}.log")
+        file_handler = RotatingFileHandler(
+            filename=log_filename,
+            maxBytes=log_size,
+            backupCount=log_file_count
+        )
+        file_handler.setFormatter(log_formatter)
+        logger.addHandler(file_handler)
+
+    # Добавление консольного обработчика по требованию
     if console_handler:
-        log_console_handler = logging.StreamHandler(sys.stdout)
-        log_console_handler.setFormatter(log_formatter)
-        logger.addHandler(log_console_handler)
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(log_formatter)
+        logger.addHandler(console_handler)
 
     return logger
