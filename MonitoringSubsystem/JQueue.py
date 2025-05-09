@@ -61,6 +61,11 @@ class JQueue(BaseQueue):
     def is_empty(self):
         return not self.qsize()
 
+    def clear(self):
+        while not self.is_empty():
+            self.get()
+
+
     # def qname(self):
     #     return self.name.value
 
