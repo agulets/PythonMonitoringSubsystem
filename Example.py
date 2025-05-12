@@ -5,7 +5,7 @@ from MonitoringSubsystem.JQueue import JQueue
 from MonitoringSubsystem.MonitoringDataClasses import TAG
 
 
-LOGGER_LEVEL = 30
+LOGGER_LEVEL = 10
 
 
 def worker_process(data_collector_queue: JQueue):

@@ -1,14 +1,13 @@
-import datetime
+import time
 import random
 import logging
-import time
-from _socket import gethostname
-from multiprocessing import current_process
-
+import datetime
 import influxdb
 import contextlib
-from MonitoringSubsystem.Commons import time_it
+from _socket import gethostname
+from multiprocessing import current_process
 from MonitoringSubsystem.JQueue import JQueue
+from MonitoringSubsystem.Commons import time_it
 from MonitoringSubsystem.MonitoringDataClasses import MONITORING_PROCESS_POINT, TAG, INFLUX_DATA, MONITORING_SYSTEM_POINT, REQUEST_MONITORING_POINT, \
     METRIC, QUEUE_STATE_MONITORING_POINT, SYSTEM_ERROR_MONITORING_POINT
 
@@ -168,15 +167,9 @@ class InfluxSender:
                 self._log_and_raise_exception(set_db_error, f"Error while try to set DB: '{db_name}'")
 
     def insert_points_to_db(self, points, chunk_size=None):
-        def _datetime_nanoseconds_randomizer(date_time):
-            # Конвертируем в наносекунды с добавлением случайности
-            if isinstance(date_time, (int, float)):  # Если уже timestamp
-                base_ns = int(date_time * 1e9) if date_time < 1e18 else int(date_time)
-            else:  # Если строковое представление
-                dt = datetime.datetime.fromisoformat(date_time.replace('Z', '+00:00'))
-                base_ns = int(dt.timestamp() * 1e9)
-
-            # Добавляем случайные 3 цифры (диапазон 0-999 нс) для уникальности
+        # Time_stamp nanosecond randomizer for reduce data lost - some times psutil set 000 in nano sec (macOS)
+        def _datetime_nanoseconds_randomizer(timestamp):
+            base_ns = int(timestamp * 1e9) if timestamp < 1e18 else int(timestamp)
             random_ns = random.randint(0, 9999)
             return base_ns + random_ns
 
