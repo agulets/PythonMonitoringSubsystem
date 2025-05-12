@@ -5,12 +5,15 @@ from MonitoringSubsystem.JQueue import JQueue
 from MonitoringSubsystem.MonitoringDataClasses import TAG
 
 
+LOGGER_LEVEL = 30
+
+
 def worker_process(data_collector_queue: JQueue):
     # Create worker queue
     worker_queue = JQueue()
 
     # Create data collector in worker process with shared metrics queue
-    worker_data_collector = DataCollector(data_collector_queue=data_collector_queue)
+    worker_data_collector = DataCollector(data_collector_queue=data_collector_queue, log_level=LOGGER_LEVEL)
     # Start process monitoring
     worker_data_collector.start_thread_for_monitoring_process(process_name="worker_process")
     # Add worker queue to monitoring
@@ -36,9 +39,10 @@ if __name__ == "__main__":
     # Main process
 
     # Datacollector test InfluxV1.8
-    main_data_collector = DataCollector(max_queue_size=20, log_level=30,
-                                        influx_sender_enable=True, influx_db_name='test', influx_user_name='test',
-                                        influx_user_pass='test', influx_host='localhost', influx_port=8085)
+    main_data_collector = DataCollector(max_queue_size=20,
+                                        log_level=LOGGER_LEVEL,
+                                        influx_sender_enable=True,
+                                        influx_db_name='test', influx_user_name='test',  influx_user_pass='test', influx_host='localhost', influx_port=8085)
     # Start system monitoring
     main_data_collector.start_system_monitoring_process(scrape_interval=5)
     # # Start main process monitoring

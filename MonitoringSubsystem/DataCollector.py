@@ -19,12 +19,12 @@ from MonitoringSubsystem.MonitoringDataClasses import (
     TAG,
 )
 from MonitoringSubsystem.SystemMonitoring import SystemMonitoring
-from MonitoringSubsystem.ProcessMonitoring import ProcessMonitoring
+from MonitoringSubsystem.ProcessMonitoring import ProcessMonitoring, get_current_process_id, get_current_process_name
 
 
 class DataCollector:
     def __init__(self, data_collector_queue: JQueue = None, max_queue_size: int = 10000, default_scrape_interval:int = 3,
-                 log_dir=None, log_size=104857608, log_file_count=2, log_level=10, log_formatter=None, influx_sender_enable = False,
+                 log_dir=None, log_size=104857608, log_file_count=2, log_level=30, log_formatter=None, influx_sender_enable = False,
                  influx_host='localhost', influx_port=8086, influx_user_name='root', influx_user_pass='root', influx_db_name=None,
                  influx_use_udp=False, influx_udp_port=4444, influx_proxies=None, influx_timeout=30, influx_retries=3, influx_pool_size=10,
                  influx_chunk_size=1000, influx_use_ssl=False, verify_ssl=False, influx_cert_path=None, influx_use_gzip=False,
@@ -183,9 +183,30 @@ class DataCollector:
         victoria_queue = JQueue()
 
         if influx_sender_config['enable']:
+            influx_sender = InfluxSender(host=influx_sender_config['host'],
+                                         port=influx_sender_config['port'],
+                                         user_name=influx_sender_config['user_name'],
+                                         user_pass=influx_sender_config['user_pass'],
+                                         db_name=influx_sender_config['db_name'],
+                                         use_udp=influx_sender_config['use_udp'],
+                                         udp_port=influx_sender_config['udp_port'],
+                                         proxies=influx_sender_config['proxies'],
+                                         timeout=influx_sender_config['timeout'],
+                                         retries=influx_sender_config['retries'],
+                                         pool_size=influx_sender_config['pool_size'],
+                                         use_ssl=influx_sender_config['use_ssl'],
+                                         verify_ssl=influx_sender_config['verify_ssl'],
+                                         cert_path=influx_sender_config['cert_path'],
+                                         use_gzip=influx_sender_config['use_gzip'],
+                                         session=influx_sender_config['session'],
+                                         headers=influx_sender_config['headers'],
+                                         url_postfix=influx_sender_config['url_postfix'],
+                                         logger=logger,
+                                         raise_exceptions=influx_sender_config['raise_exceptions'])
+
             influx_thread = threading.Thread(
-                target=influx_sender_thread,
-                args=(influx_sender_config, influx_queue, logger),
+                target=influx_sender.influx_sender_thread,
+                args=(influx_queue, ),
                 daemon=True
             )
             influx_thread.start()
@@ -234,7 +255,7 @@ class DataCollector:
 
     def start_processing_process(self):
         self.processing_process = multiprocessing.Process(
-            name="metric_processing_process",
+            name=f"metric_processing_process_by_{get_current_process_name()}_{get_current_process_id()}",
             target=self._metric_processing_loop,
             args=(self.data_collector_queue, self.max_queue_size, self.log_params,
                   self.default_scrape_interval, self.influx_sender_config, self.victoria_sender_config),
@@ -253,54 +274,54 @@ class DataCollector:
             self.processing_process.join()
 
 
-def influx_sender_thread(influx_sender_config: dict,
-                         influx_sender_queue: JQueue,
-                         _logger: logging.Logger):
-
-    _logger.info(f"Start new influx sender thread:{threading.current_thread().name}'")
-    influx_db = InfluxSender(host=influx_sender_config['host'],
-                             port=influx_sender_config['port'],
-                             user_name=influx_sender_config['user_name'],
-                             user_pass=influx_sender_config['user_pass'],
-                             db_name=influx_sender_config['db_name'],
-                             use_udp=influx_sender_config['use_udp'],
-                             udp_port=influx_sender_config['udp_port'],
-                             proxies=influx_sender_config['proxies'],
-                             timeout=influx_sender_config['timeout'],
-                             retries=influx_sender_config['retries'],
-                             pool_size=influx_sender_config['pool_size'],
-                             use_ssl=influx_sender_config['use_ssl'],
-                             verify_ssl=influx_sender_config['verify_ssl'],
-                             cert_path=influx_sender_config['cert_path'],
-                             use_gzip=influx_sender_config['use_gzip'],
-                             session=influx_sender_config['session'],
-                             headers=influx_sender_config['headers'],
-                             url_postfix=influx_sender_config['url_postfix'],
-                             logger=_logger,
-                             raise_exceptions=influx_sender_config['raise_exceptions'])
-    influx_db.check_db_existing()
-
-    while True:
-        try:
-            points_for_send_pack = []
-            for element in range(influx_sender_queue.qsize()):
-                if not influx_sender_queue.empty():
-                    points_for_send_pack.append(influx_sender_queue.get())
-            influx_db.insert_points_to_db(points=points_for_send_pack, chunk_size=influx_sender_config['chunk_size'])
-
-        except Exception as influx_sender_thread_exception:
-            _logger.exception(f"Exception in influx_sender_thread: {influx_sender_thread_exception}")
-            tags = [TAG(name='process_name', value=multiprocessing.current_process().name),
-                    TAG(name='action_type', value='influx_sender_thread')]
-            system_error_point = SYSTEM_ERROR_MONITORING_POINT(name='system_error',
-                                                               host_name=gethostname(),
-                                                               time_stamp=time.time_ns(),
-                                                               err_code=1,
-                                                               tags=tags)
-            influx_error_points = get_influx_points_by_data_collector_point(system_error_point)
-            for influx_error_point in influx_error_points:
-                influx_sender_queue.put(influx_error_point)
-        time.sleep(1)
+# def influx_sender_thread(influx_sender_config: dict,
+#                          influx_sender_queue: JQueue,
+#                          _logger: logging.Logger):
+#
+#     _logger.info(f"Start new influx sender thread:{threading.current_thread().name}'")
+#     influx_db = InfluxSender(host=influx_sender_config['host'],
+#                              port=influx_sender_config['port'],
+#                              user_name=influx_sender_config['user_name'],
+#                              user_pass=influx_sender_config['user_pass'],
+#                              db_name=influx_sender_config['db_name'],
+#                              use_udp=influx_sender_config['use_udp'],
+#                              udp_port=influx_sender_config['udp_port'],
+#                              proxies=influx_sender_config['proxies'],
+#                              timeout=influx_sender_config['timeout'],
+#                              retries=influx_sender_config['retries'],
+#                              pool_size=influx_sender_config['pool_size'],
+#                              use_ssl=influx_sender_config['use_ssl'],
+#                              verify_ssl=influx_sender_config['verify_ssl'],
+#                              cert_path=influx_sender_config['cert_path'],
+#                              use_gzip=influx_sender_config['use_gzip'],
+#                              session=influx_sender_config['session'],
+#                              headers=influx_sender_config['headers'],
+#                              url_postfix=influx_sender_config['url_postfix'],
+#                              logger=_logger,
+#                              raise_exceptions=influx_sender_config['raise_exceptions'])
+#     influx_db.check_db_existing()
+#
+#     while True:
+#         try:
+#             points_for_send_pack = []
+#             for element in range(influx_sender_queue.qsize()):
+#                 if not influx_sender_queue.empty():
+#                     points_for_send_pack.append(influx_sender_queue.get())
+#             influx_db.insert_points_to_db(points=points_for_send_pack, chunk_size=influx_sender_config['chunk_size'])
+#
+#         except Exception as influx_sender_thread_exception:
+#             _logger.exception(f"Exception in influx_sender_thread: {influx_sender_thread_exception}")
+#             tags = [TAG(name='process_name', value=multiprocessing.current_process().name),
+#                     TAG(name='action_type', value='influx_sender_thread')]
+#             system_error_point = SYSTEM_ERROR_MONITORING_POINT(name='system_error',
+#                                                                host_name=gethostname(),
+#                                                                time_stamp=time.time_ns(),
+#                                                                err_code=1,
+#                                                                tags=tags)
+#             influx_error_points = get_influx_points_by_data_collector_point(system_error_point)
+#             for influx_error_point in influx_error_points:
+#                 influx_sender_queue.put(influx_error_point)
+#         time.sleep(1)
 
 
 def victoria_sender_thread(victoria_queue: JQueue, logger: logging.Logger):

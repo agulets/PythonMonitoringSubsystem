@@ -16,6 +16,9 @@ def get_current_process_id():
 def get_process_name_by_pid(process_id):
     return psutil.Process(pid=process_id).name()
 
+def get_current_process_name():
+    current_process_id = get_current_process_id()
+    return get_process_name_by_pid(current_process_id)
 
 class ProcessMonitoring:
     global cpu_usage_percent_process
@@ -98,6 +101,7 @@ class ProcessMonitoring:
 if __name__ == "__main__":
     from multiprocessing import current_process
 
+    print(get_current_process_name())
     # Process monitoring example
     process_monitoring = ProcessMonitoring(process_name=current_process().name)
     # with process_monitoring:
