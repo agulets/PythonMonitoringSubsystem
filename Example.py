@@ -34,15 +34,19 @@ if __name__ == "__main__":
     from multiprocessing import Process
 
     # Main process
-    main_data_collector = DataCollector(max_queue_size=20)
+
+    # Datacollector test InfluxV1.8
+    main_data_collector = DataCollector(max_queue_size=20, log_level=30,
+                                        influx_sender_enable=True, influx_db_name='test', influx_user_name='test',
+                                        influx_user_pass='test', influx_host='localhost', influx_port=8085)
     # Start system monitoring
-    main_data_collector.start_system_monitoring_process(scrape_interval=3)
+    main_data_collector.start_system_monitoring_process(scrape_interval=5)
     # # Start main process monitoring
-    # main_data_collector.start_thread_for_monitoring_process(process_name="Main")
+    main_data_collector.start_thread_for_monitoring_process(process_name="Main")
     #
-    # # Create and start worker process
-    # worker = Process(target=worker_process, args=(main_data_collector.get_data_collector_queue(),))
-    # worker.start()
+    # Create and start worker process
+    worker = Process(name='TEST_worker_process_1', target=worker_process, args=(main_data_collector.get_data_collector_queue(),))
+    worker.start()
 
     while True:
         time.sleep(3)
