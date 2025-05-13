@@ -26,6 +26,7 @@ class DataCollector:
     def __init__(self, data_collector_queue: JQueue = None, max_queue_size: int = 10000, default_scrape_interval:int = 3,
                  log_dir=None, log_size=104857608, log_file_count=2, log_level=30, log_formatter=None, influx_sender_enable = False,
                  influx_host='localhost', influx_port=8086, influx_user_name='root', influx_user_pass='root', influx_db_name=None,
+                 influx_token=None, influx_org='-', influx_bucket=None,
                  influx_use_udp=False, influx_udp_port=4444, influx_proxies=None, influx_timeout=30, influx_retries=3, influx_pool_size=10,
                  influx_chunk_size=1000, influx_use_ssl=False, verify_ssl=False, influx_cert_path=None, influx_use_gzip=False,
                  influx_session=None, influx_headers=None, influx_url_postfix='', influx_raise_exceptions=True,
@@ -46,6 +47,9 @@ class DataCollector:
             'port': influx_port,
             'user_name': influx_user_name,
             'user_pass': influx_user_pass,
+            'token': influx_token,
+            'org': influx_org,
+            'bucket': influx_bucket,
             'db_name': influx_db_name,
             'use_udp': influx_use_udp,
             'udp_port': influx_udp_port,
@@ -94,8 +98,8 @@ class DataCollector:
         logger = get_logger_by_params_and_make_log_folder( log_name="host_monitoring", **log_params)
         host_monitor = SystemMonitoring(logger=logger)
         process_monitor = ProcessMonitoring(process_name="self_monitoring_process", logger=logger)
-        while True:
-            with host_monitor:
+        with host_monitor:
+            while True:
                 host_metric_point = host_monitor.get_system_monitoring_point()
                 data_collector_queue.put(host_metric_point)
 
@@ -187,6 +191,9 @@ class DataCollector:
                                          port=influx_sender_config['port'],
                                          user_name=influx_sender_config['user_name'],
                                          user_pass=influx_sender_config['user_pass'],
+                                         token=influx_sender_config['token'],
+                                         org=influx_sender_config['org'],
+                                         bucket=influx_sender_config['bucket'],
                                          db_name=influx_sender_config['db_name'],
                                          use_udp=influx_sender_config['use_udp'],
                                          udp_port=influx_sender_config['udp_port'],
