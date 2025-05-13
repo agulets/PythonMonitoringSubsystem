@@ -31,8 +31,11 @@ class SystemMonitoring:
         global cpu_usage_percent_cores
 
         while self.realtime_cpu_monitoring:
-            cpu_usage_percent_host = psutil.cpu_times_percent(interval=self.cpu_mon_interval)
-            cpu_usage_percent_cores = psutil.cpu_times_percent(interval=self.cpu_mon_interval, percpu=True)
+            try:
+                cpu_usage_percent_host = psutil.cpu_times_percent(interval=self.cpu_mon_interval)
+                cpu_usage_percent_cores = psutil.cpu_times_percent(interval=self.cpu_mon_interval, percpu=True)
+            except Exception as err_getting_cpu_metric:
+                self.logger.exception(f"Scraping process error:{str(err_getting_cpu_metric)}\n {err_getting_cpu_metric}")
 
     def __init__(self, cpu_mon_interval=1, logger=None):
         self.start_info = self._get_system_info()
