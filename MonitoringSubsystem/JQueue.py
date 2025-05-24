@@ -65,7 +65,6 @@ class JQueue(BaseQueue):
         while not self.is_empty():
             self.get()
 
-
     # def qname(self):
     #     return self.name.value
 

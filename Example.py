@@ -5,8 +5,8 @@ from MonitoringSubsystem.JQueue import JQueue
 from MonitoringSubsystem.MonitoringDataClasses import TAG
 
 
-LOGGER_LEVEL = 10
-
+LOGGER_LEVEL = 20
+LOAD = 0.5
 
 def worker_process(data_collector_queue: JQueue):
     # Create worker queue
@@ -22,13 +22,19 @@ def worker_process(data_collector_queue: JQueue):
     # Simulate some work
     while True:
         for i in range(random.randint(1,3)):
+
             worker_queue.put(f"{time.time()}")
             print("worker - put some stuff to worker_queue")
-            time.sleep(random.randint(1,3))
+            time.sleep(random.randint(1,3) * 0.1)
 
         # Keep alive
         print("worker tick")
-        time.sleep(random.randint(1,3))
+        start_time = time.time()
+
+        while time.time() - start_time < 0.1 * LOAD:
+            sum(range(10 ** 5))  # Небольшие вычисления
+
+        time.sleep(0.1 * (1 - LOAD))
 
 
 if __name__ == "__main__":
@@ -39,10 +45,16 @@ if __name__ == "__main__":
     # Main process
 
     # Datacollector test InfluxV1.8
-    main_data_collector = DataCollector(max_queue_size=20,
-                                        log_level=LOGGER_LEVEL,
-                                        influx_sender_enable=True,
-                                        influx_db_name='test', influx_user_name='test',  influx_user_pass='test', influx_host='localhost', influx_port=8085)
+    main_data_collector = DataCollector(max_queue_size=30, log_level=LOGGER_LEVEL,
+                  influx_sender_enable=True,
+                # influx_db_name='test', influx_user_name='test',  influx_user_pass='test', influx_host='localhost', influx_port=8085
+                  influx_host='localhost', influx_port=8086,
+                  influx_token='22Yufe0OdxOU1SEfF4krQrc8NW-SlplUNjXq3Iu9LnLEz3QdMK_52V95HtfjgF9YTbEo2QwbqR2EtN-mlxVTJg==',
+                  influx_bucket='bucket', influx_org='test',
+
+                 #
+                  victoria_sender_enable=True, victoria_sender_url='http://localhost:8442/api/v1/import/prometheus'
+    )
     # Start system monitoring
     main_data_collector.start_system_monitoring_process(scrape_interval=5)
     # # Start main process monitoring

@@ -1,12 +1,11 @@
 import time
 import random
 import logging
-import datetime
 import influxdb
 import contextlib
 from _socket import gethostname
-from multiprocessing import current_process
 from abc import ABC, abstractmethod
+from multiprocessing import current_process
 from typing import List, Union, Generator
 
 try:
@@ -17,7 +16,6 @@ except ImportError:
     influxdb_client = None
 
 from MonitoringSubsystem.JQueue import JQueue
-from MonitoringSubsystem.Commons import time_it
 from MonitoringSubsystem.MonitoringDataClasses import (
     MONITORING_PROCESS_POINT, TAG, INFLUX_DATA, MONITORING_SYSTEM_POINT,
     REQUEST_MONITORING_POINT, METRIC, QUEUE_STATE_MONITORING_POINT,
@@ -354,6 +352,7 @@ class InfluxSender:
             point_dict['time'] = self._datetime_nanoseconds_randomizer(point_dict['time'])
             processed_points.append(point_dict)
 
+
         def process_chunk(chunk: List[dict]) -> None:
             with self.get_client() as client:
                 try:
@@ -362,9 +361,9 @@ class InfluxSender:
                         database=self.db_name if self.client_version == 'v1' else None
                     )
                     if not success:
-                        raise Exception("Failed to write points to database")
+                        raise Exception("Failed to write points to influx database.")
 
-                    self.logger.info(f"Successfully wrote {len(chunk)} points")
+                    self.logger.info(f"Successfully wrote {len(chunk)} points to influx.")
                     self.logger.debug(f"Written points: {chunk}")
                 except Exception as e:
                     self._log_and_raise_exception(e, "Failed to write points chunk")
@@ -393,13 +392,14 @@ class InfluxSender:
             except Exception as e:
                 # self.logger.error(f"Error in sender thread: {str(e)}")
                 self.logger.exception(f"Error in sender thread: {e}")
-                error_point = _create_error_point(str(e))
-                sender_queue.put(error_point)
+                error_points = _create_error_points(str(e))
+                for error_point in error_points:
+                    sender_queue.put(error_point)
                 time.sleep(1)
 
 
 # ==================== DATA CONVERSION FUNCTIONS ====================
-def _create_error_point(error_message: str) -> list[INFLUX_DATA]:
+def _create_error_points(error_message: str) -> list[INFLUX_DATA]:
     tags = [
         TAG(name='process_name', value=current_process().name),
         TAG(name='action_type', value='influx_sender_thread'),

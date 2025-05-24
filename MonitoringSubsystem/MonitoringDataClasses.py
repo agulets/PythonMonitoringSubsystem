@@ -71,5 +71,6 @@ MONITORING_SYSTEM_POINT = namedtuple('MONITORING_SYSTEM_POINT', [
 # Namedtuple для хранения информации о мониторируемых очередях и процессах
 MONITORED_QUEUE = namedtuple('MONITORED_QUEUE', ['queue', 'name', 'tags'])
 
-# INFLUX_FIELD = namedtuple('INFLUX_FIELD', ['field_name', 'field_value'])
 INFLUX_DATA = namedtuple('INFLUX_DATA', ['measurement', 'time', 'tags', 'fields'])
+
+VICTORIA_POINT = namedtuple('VICTORIA_POINT', ['metric_name', 'timestamp', 'tags', 'value'])

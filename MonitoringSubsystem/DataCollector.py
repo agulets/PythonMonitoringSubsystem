@@ -1,14 +1,16 @@
 import time
-import logging
 import threading
 import multiprocessing
 from socket import gethostname
 from threading import Thread, Event
 
 from MonitoringSubsystem import InfluxSender
+from MonitoringSubsystem.JQueue import JQueue
 from MonitoringSubsystem.Commons import get_logger_by_params_and_make_log_folder
 from MonitoringSubsystem.InfluxSender import InfluxSender, get_influx_points_by_data_collector_point
-from MonitoringSubsystem.JQueue import JQueue
+from MonitoringSubsystem.SystemMonitoring import SystemMonitoring
+from MonitoringSubsystem.ProcessMonitoring import ProcessMonitoring, get_current_process_id, get_current_process_name
+from MonitoringSubsystem.VictoriaSender import get_victoria_points_by_data_collector_point, VictoriaMetricsSender
 from MonitoringSubsystem.MonitoringDataClasses import (
     MONITORING_SYSTEM_POINT,
     MONITORING_PROCESS_POINT,
@@ -18,8 +20,6 @@ from MonitoringSubsystem.MonitoringDataClasses import (
     MONITORED_QUEUE,
     TAG,
 )
-from MonitoringSubsystem.SystemMonitoring import SystemMonitoring
-from MonitoringSubsystem.ProcessMonitoring import ProcessMonitoring, get_current_process_id, get_current_process_name
 
 
 class DataCollector:
@@ -31,7 +31,7 @@ class DataCollector:
                  influx_chunk_size=1000, influx_use_ssl=False, verify_ssl=False, influx_cert_path=None, influx_use_gzip=False,
                  influx_session=None, influx_headers=None, influx_url_postfix='', influx_raise_exceptions=True,
 
-                 victoria_sender_enable=False):
+                 victoria_sender_enable=False, victoria_sender_url=None, victoria_sender_timeout=10):
         self.log_params = {
             'log_dir': log_dir,
             'log_size': log_size,
@@ -69,6 +69,8 @@ class DataCollector:
         }
         self.victoria_sender_config = {
             'enable': victoria_sender_enable,
+            'url': victoria_sender_url,
+            'timeout': victoria_sender_timeout
         }
 
         self.data_collector_queue = data_collector_queue or JQueue()
@@ -223,14 +225,17 @@ class DataCollector:
             metric_processing_data_collector.add_queue_to_monitoring(queue=victoria_queue,
                                                                      name="victoria_queue",
                                                                      scrape_interval=scrape_interval)
-
+            victoria_sender = VictoriaMetricsSender(url_prometheus_import=victoria_sender_config['url'],
+                                                    timeout=victoria_sender_config['timeout'],
+                                                    logger=logger
+                                                    )
             victoria_thread = threading.Thread(
-                target=victoria_sender_thread,
-                args=(victoria_queue, logger, victoria_sender_config),
+                target=victoria_sender.sender_loop,
+                args=(victoria_queue, ),
                 daemon=True
             )
             victoria_thread.start()
-            logger.info(f"Started VictoriaMetrics logger thread: {victoria_thread.name}")
+            logger.info(f"Started VictoriaMetrics sender thread: {victoria_thread.name}")
 
         while True:
             # Check for queues overflown
@@ -251,13 +256,9 @@ class DataCollector:
                     for influx_point in influx_points:
                         influx_queue.put(influx_point)
                 if victoria_sender_config['enable']:
-                    victoria_queue.put(item)
-
-
-            # Process metrics
-            # while not metrics_queue.is_empty():
-            #     item = metrics_queue.get()
-            #     logger.debug(f"Get next monitoring point from queue:'{item}'")
+                    victoria_points = get_victoria_points_by_data_collector_point(item, logger=logger)
+                    for victoria_point in victoria_points:
+                        victoria_queue.put(victoria_point)
             time.sleep(1)
 
     def start_processing_process(self):
@@ -279,65 +280,3 @@ class DataCollector:
         if self.processing_process:
             self.processing_process.terminate()
             self.processing_process.join()
-
-
-# def influx_sender_thread(influx_sender_config: dict,
-#                          influx_sender_queue: JQueue,
-#                          _logger: logging.Logger):
-#
-#     _logger.info(f"Start new influx sender thread:{threading.current_thread().name}'")
-#     influx_db = InfluxSender(host=influx_sender_config['host'],
-#                              port=influx_sender_config['port'],
-#                              user_name=influx_sender_config['user_name'],
-#                              user_pass=influx_sender_config['user_pass'],
-#                              db_name=influx_sender_config['db_name'],
-#                              use_udp=influx_sender_config['use_udp'],
-#                              udp_port=influx_sender_config['udp_port'],
-#                              proxies=influx_sender_config['proxies'],
-#                              timeout=influx_sender_config['timeout'],
-#                              retries=influx_sender_config['retries'],
-#                              pool_size=influx_sender_config['pool_size'],
-#                              use_ssl=influx_sender_config['use_ssl'],
-#                              verify_ssl=influx_sender_config['verify_ssl'],
-#                              cert_path=influx_sender_config['cert_path'],
-#                              use_gzip=influx_sender_config['use_gzip'],
-#                              session=influx_sender_config['session'],
-#                              headers=influx_sender_config['headers'],
-#                              url_postfix=influx_sender_config['url_postfix'],
-#                              logger=_logger,
-#                              raise_exceptions=influx_sender_config['raise_exceptions'])
-#     influx_db.check_db_existing()
-#
-#     while True:
-#         try:
-#             points_for_send_pack = []
-#             for element in range(influx_sender_queue.qsize()):
-#                 if not influx_sender_queue.empty():
-#                     points_for_send_pack.append(influx_sender_queue.get())
-#             influx_db.insert_points_to_db(points=points_for_send_pack, chunk_size=influx_sender_config['chunk_size'])
-#
-#         except Exception as influx_sender_thread_exception:
-#             _logger.exception(f"Exception in influx_sender_thread: {influx_sender_thread_exception}")
-#             tags = [TAG(name='process_name', value=multiprocessing.current_process().name),
-#                     TAG(name='action_type', value='influx_sender_thread')]
-#             system_error_point = SYSTEM_ERROR_MONITORING_POINT(name='system_error',
-#                                                                host_name=gethostname(),
-#                                                                time_stamp=time.time_ns(),
-#                                                                err_code=1,
-#                                                                tags=tags)
-#             influx_error_points = get_influx_points_by_data_collector_point(system_error_point)
-#             for influx_error_point in influx_error_points:
-#                 influx_sender_queue.put(influx_error_point)
-#         time.sleep(1)
-
-
-def victoria_sender_thread(victoria_queue: JQueue, logger: logging.Logger):
-    logger.info(f"VictoriaMetrics sender thread started: {threading.current_thread().name}")
-    while True:
-        try:
-            if not victoria_queue.empty():
-                item = victoria_queue.get()
-                logger.debug(f"VictoriaMetrics would send: {item}")
-        except Exception as e:
-            logger.error(f"Error in VictoriaMetrics logger thread: {e}")
-        time.sleep(1)
