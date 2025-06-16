@@ -9,3 +9,4 @@ pyOpenSSL~=20.0.1
 Flask-Caching~=2.0.2
 untangle~=1.2.1
 psutil~=7.0.0
+influxdb-client~=1.48.0

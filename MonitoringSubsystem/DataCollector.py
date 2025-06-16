@@ -31,7 +31,8 @@ class DataCollector:
                  influx_chunk_size=1000, influx_use_ssl=False, verify_ssl=False, influx_cert_path=None, influx_use_gzip=False,
                  influx_session=None, influx_headers=None, influx_url_postfix='', influx_raise_exceptions=True,
 
-                 victoria_sender_enable=False, victoria_sender_url=None, victoria_sender_timeout=10):
+                 victoria_sender_enable=False, victoria_sender_url=None, victoria_sender_timeout=10,
+                 additional_tags: list[TAG]=None):
         self.log_params = {
             'log_dir': log_dir,
             'log_size': log_size,
@@ -40,6 +41,7 @@ class DataCollector:
             'formatter': log_formatter
         }
         self.logger = get_logger_by_params_and_make_log_folder(log_name='main_data_collector', **self.log_params)
+        self.additional_tags = additional_tags
 
         self.influx_sender_config = {
             'enable': influx_sender_enable,
@@ -175,7 +177,7 @@ class DataCollector:
 
     @staticmethod
     def _metric_processing_loop(metrics_queue: JQueue, max_size: int, log_params: dict, scrape_interval: int,
-                                influx_sender_config: dict = None, victoria_sender_config: dict = None):
+                                influx_sender_config: dict = None, victoria_sender_config: dict = None, extra_tags:list[TAG] = None):
         logger = get_logger_by_params_and_make_log_folder(log_name="metric_processing", **log_params)
 
         # ___ example of adding thread in any process for monitoring it ______________________________________
@@ -252,11 +254,11 @@ class DataCollector:
             while not metrics_queue.empty():
                 item = metrics_queue.get()
                 if influx_sender_config['enable'] :
-                    influx_points = get_influx_points_by_data_collector_point(item)
+                    influx_points = get_influx_points_by_data_collector_point(item, extra_tags=extra_tags)
                     for influx_point in influx_points:
                         influx_queue.put(influx_point)
                 if victoria_sender_config['enable']:
-                    victoria_points = get_victoria_points_by_data_collector_point(item, logger=logger)
+                    victoria_points = get_victoria_points_by_data_collector_point(item, logger=logger, extra_tags=extra_tags)
                     for victoria_point in victoria_points:
                         victoria_queue.put(victoria_point)
             time.sleep(1)
@@ -266,7 +268,7 @@ class DataCollector:
             name=f"metric_processing_process_by_{get_current_process_name()}_{get_current_process_id()}",
             target=self._metric_processing_loop,
             args=(self.data_collector_queue, self.max_queue_size, self.log_params,
-                  self.default_scrape_interval, self.influx_sender_config, self.victoria_sender_config),
+                  self.default_scrape_interval, self.influx_sender_config, self.victoria_sender_config, self.additional_tags),
             daemon=True
         )
         self.processing_process.start()

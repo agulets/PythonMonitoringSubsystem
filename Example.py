@@ -53,7 +53,8 @@ if __name__ == "__main__":
                   influx_bucket='bucket', influx_org='test',
 
                  #
-                  victoria_sender_enable=True, victoria_sender_url='http://localhost:8442/api/v1/import/prometheus'
+                  victoria_sender_enable=True, victoria_sender_url='http://localhost:8442/api/v1/import/prometheus',
+                  additional_tags=[TAG("extra_tag_name","extra_tag_value"), ]
     )
     # Start system monitoring
     main_data_collector.start_system_monitoring_process(scrape_interval=5)

@@ -7,13 +7,9 @@ from _socket import gethostname
 from abc import ABC, abstractmethod
 from multiprocessing import current_process
 from typing import List, Union, Generator
-
-try:
-    import influxdb_client
-    from influxdb_client import Point, WritePrecision
-    from influxdb_client.client.write_api import SYNCHRONOUS
-except ImportError:
-    influxdb_client = None
+import influxdb_client
+from influxdb_client import Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 from MonitoringSubsystem.JQueue import JQueue
 from MonitoringSubsystem.MonitoringDataClasses import (
